@@ -26,6 +26,7 @@ enum Command {
     /// Set noise cancellation level (0-10, where 10 = max NC)
     Set {
         /// NC level: 0 (transparency) to 10 (max noise cancelling)
+        #[arg(value_parser = clap::value_parser!(u8).range(0..=10))]
         level: u8,
     },
 
@@ -40,37 +41,32 @@ enum Command {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    if let Command::Scan = cli.command {
-        let devices = device::list_connected_bose();
-        if devices.is_empty() {
-            println!("No connected Bose devices found.");
-        } else {
-            for d in &devices {
-                println!("  {} ({})", d.name, d.address);
+    match cli.command {
+        Command::Scan => {
+            let devices = device::list_connected_bose();
+            if devices.is_empty() {
+                println!("No connected Bose devices found.");
+            } else {
+                for d in &devices {
+                    println!("  {} ({})", d.name, d.address);
+                }
             }
         }
-        return Ok(());
-    }
-
-    let dev = device::find_device(cli.device.as_deref())?;
-
-    match cli.command {
         Command::Status => {
+            let dev = device::find_device(cli.device.as_deref())?;
             let status = dev.get_nc_status()?;
             print_status(&status);
         }
         Command::Set { level } => {
-            if level > 10 {
-                return Err(anyhow::anyhow!("Level must be 0-10"));
-            }
+            let dev = device::find_device(cli.device.as_deref())?;
             dev.set_nc(level, true)?;
-            println!("Noise cancellation: {}", format!("ON (level {level})"));
+            println!("Noise cancellation: ON (level {level})");
         }
         Command::Off => {
+            let dev = device::find_device(cli.device.as_deref())?;
             dev.set_nc(0, false)?;
             println!("Noise cancellation: OFF");
         }
-        Command::Scan => unreachable!(),
     }
 
     Ok(())

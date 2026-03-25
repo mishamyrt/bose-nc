@@ -17,9 +17,7 @@ cc = "1"
 
 [lints.rust]
 unreachable_pub = "warn"
-unexpected_cfgs = { level = "warn", check-cfg = [
-    "cfg(codspeed)",
-] }
+unexpected_cfgs = "warn"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -2 }
