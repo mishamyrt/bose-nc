@@ -5,12 +5,9 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(
-    name = "bose-nc",
-    about = "Control noise cancellation on Bose headphones"
-)]
+#[command(name = "bose-cli", about = "Control noise cancellation on Bose headphones")]
 struct Cli {
-    /// Filter device by name substring (e.g. "NC700", "QCUltra")
+    /// Filter device by name substring (e.g. "NC700", "`QCUltra`")
     #[arg(short, long)]
     device: Option<String>,
 
@@ -36,11 +33,12 @@ enum Command {
     Scan,
 }
 
+#[allow(clippy::print_stdout)]
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
     if let Command::Scan = cli.command {
-        let devices = device::list_connected_bose()?;
+        let devices = device::list_connected_bose();
         if devices.is_empty() {
             println!("No connected Bose devices found.");
         } else {
@@ -63,14 +61,11 @@ fn main() -> Result<()> {
                 return Err(anyhow::anyhow!("Level must be 0-10"));
             }
             dev.set_nc(level, level > 0)?;
-            println!(
-                "Noise cancellation: {}",
-                if level > 0 {
-                    format!("ON (level {})", level)
-                } else {
-                    "OFF (transparency)".to_string()
-                }
-            );
+            println!("Noise cancellation: {}", if level > 0 {
+                format!("ON (level {level})")
+            } else {
+                "OFF (transparency)".to_string()
+            });
         }
         Command::Off => {
             dev.set_nc(0, false)?;
@@ -82,6 +77,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::print_stdout)]
 fn print_status(status: &bmap::CncStatus) {
     if status.enabled {
         println!(

@@ -1,32 +1,32 @@
 #![allow(dead_code)]
 
-/// Bose BMAP (Bose Multi-device Application Protocol) implementation.
-/// Reverse-engineered from the Bose Music Android application.
-///
-/// NC 700 wire format for SettingsCnc:
-///   Send: [0x01, 0x05, 0x02, 0x02, (10 - level), enabled]
-///   Response: [0x01, 0x05, 0x03, 0x03, 0x0B, (10 - level), enabled]
-///   Level is inverted: wire_value = 10 - user_level
+//! Bose BMAP (Bose Multi-device Application Protocol) implementation.
+//! Reverse-engineered from the Bose Music Android application.
+//!
+//! NC 700 wire format for `SettingsCnc`:
+//!   Send: `[0x01, 0x05, 0x02, 0x02, (10 - level), enabled]`
+//!   Response: `[0x01, 0x05, 0x03, 0x03, 0x0B, (10 - level), enabled]`
+//!   Level is inverted: `wire_value = 10 - user_level`
 
-pub const HEADER_SIZE: usize = 4;
+pub(crate) const HEADER_SIZE: usize = 4;
 const MAX_NC_LEVEL: u8 = 10;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
-pub enum FunctionBlock {
+pub(crate) enum FunctionBlock {
     Settings = 0x01,
 }
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
-pub enum Function {
+pub(crate) enum Function {
     SettingsCnc = 0x05,
     SettingsAnr = 0x06,
 }
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
-pub enum Operator {
+pub(crate) enum Operator {
     Set = 0x00,
     Get = 0x01,
     SetGet = 0x02,
@@ -35,17 +35,17 @@ pub enum Operator {
 }
 
 #[derive(Debug)]
-pub struct BmapPacket {
-    pub function_block: u8,
-    pub function: u8,
-    pub device_id: u8,
-    pub port_num: u8,
-    pub operator: u8,
-    pub payload: Vec<u8>,
+pub(crate) struct BmapPacket {
+    pub(crate) function_block: u8,
+    pub(crate) function: u8,
+    pub(crate) device_id: u8,
+    pub(crate) port_num: u8,
+    pub(crate) operator: u8,
+    pub(crate) payload: Vec<u8>,
 }
 
 impl BmapPacket {
-    pub fn new(
+    pub(crate) fn new(
         function_block: FunctionBlock,
         function: Function,
         operator: Operator,
@@ -65,7 +65,8 @@ impl BmapPacket {
         (self.device_id << 6) | (self.port_num << 4) | self.operator
     }
 
-    pub fn to_bytes(&self) -> Vec<u8> {
+    #[allow(clippy::cast_possible_truncation)]
+    pub(crate) fn to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(HEADER_SIZE + self.payload.len());
         buf.push(self.function_block);
         buf.push(self.function);
@@ -75,7 +76,7 @@ impl BmapPacket {
         buf
     }
 
-    pub fn parse(data: &[u8]) -> Option<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Option<Self> {
         if data.len() < HEADER_SIZE {
             return None;
         }
@@ -95,15 +96,15 @@ impl BmapPacket {
 }
 
 #[derive(Debug)]
-pub struct CncStatus {
-    pub level: u8,
-    pub max_level: u8,
-    pub enabled: bool,
+pub(crate) struct CncStatus {
+    pub(crate) level: u8,
+    pub(crate) max_level: u8,
+    pub(crate) enabled: bool,
 }
 
 impl CncStatus {
-    /// Parse CNC response payload: [num_steps, 10-level, enabled]
-    pub fn parse(payload: &[u8]) -> Option<Self> {
+    /// Parse CNC response payload: `[num_steps, 10-level, enabled]`.
+    pub(crate) fn parse(payload: &[u8]) -> Option<Self> {
         if payload.len() < 3 {
             return None;
         }
@@ -121,7 +122,7 @@ impl CncStatus {
 }
 
 /// Build a CNC Get packet (query current noise cancellation state).
-pub fn cnc_get_packet() -> Vec<u8> {
+pub(crate) fn cnc_get_packet() -> Vec<u8> {
     BmapPacket::new(
         FunctionBlock::Settings,
         Function::SettingsCnc,
@@ -131,21 +132,21 @@ pub fn cnc_get_packet() -> Vec<u8> {
     .to_bytes()
 }
 
-/// Build a CNC SetGet packet for NC 700.
+/// Build a CNC `SetGet` packet for NC 700.
 /// `level`: user-facing level 0-10 (10 = max NC, 0 = full transparency).
 /// `enabled`: whether NC is on at all.
-pub fn cnc_set_packet(level: u8, enabled: bool) -> Vec<u8> {
+pub(crate) fn cnc_set_packet(level: u8, enabled: bool) -> Vec<u8> {
     let wire_level = MAX_NC_LEVEL.saturating_sub(level);
     BmapPacket::new(
         FunctionBlock::Settings,
         Function::SettingsCnc,
         Operator::SetGet,
-        vec![wire_level, enabled as u8],
+        vec![wire_level, u8::from(enabled)],
     )
     .to_bytes()
 }
 
-pub fn anr_set_packet(level: u8) -> Vec<u8> {
+pub(crate) fn anr_set_packet(level: u8) -> Vec<u8> {
     BmapPacket::new(
         FunctionBlock::Settings,
         Function::SettingsAnr,
