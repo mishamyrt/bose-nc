@@ -18,6 +18,14 @@ Other Bose headphones that use BMAP over SPP may also work.
 
 ## Installation
 
+### Homebrew
+
+```sh
+brew install mishamyrt/lidoff/bose-nc
+```
+
+### From source
+
 ```sh
 cargo build --release
 cp target/release/bose-nc /usr/local/bin/

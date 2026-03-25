@@ -1,22 +1,29 @@
 name: Update Homebrew Tap
 
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
 
 jobs:
   update-tap:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
     steps:
       - name: Compute SHA256
         id: sha
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ github.event.workflow_run.head_branch }}
         run: |
-          URL="https://github.com/mishamyrt/bose-nc/archive/refs/tags/${TAG}.tar.gz"
-          SHA=$(curl -sL "$URL" | shasum -a 256 | awk '{print $1}')
-          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
-          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          BASE="https://github.com/mishamyrt/bose-nc/releases/download/${TAG}"
+          ARM_URL="${BASE}/bose-nc-aarch64-apple-darwin.tar.xz"
+          AMD_URL="${BASE}/bose-nc-x86_64-apple-darwin.tar.xz"
+          ARM_SHA=$(curl -sL "$ARM_URL" | shasum -a 256 | awk '{print $1}')
+          AMD_SHA=$(curl -sL "$AMD_URL" | shasum -a 256 | awk '{print $1}')
+          echo "arm_sha256=$ARM_SHA" >> "$GITHUB_OUTPUT"
+          echo "arm_url=$ARM_URL" >> "$GITHUB_OUTPUT"
+          echo "amd_sha256=$AMD_SHA" >> "$GITHUB_OUTPUT"
+          echo "amd_url=$AMD_URL" >> "$GITHUB_OUTPUT"
 
       - name: Checkout tap
         uses: actions/checkout@v4
@@ -26,17 +33,46 @@ jobs:
 
       - name: Update formula
         env:
-          TAG: ${{ github.ref_name }}
-          SHA256: ${{ steps.sha.outputs.sha256 }}
-          URL: ${{ steps.sha.outputs.url }}
+          TAG: ${{ github.event.workflow_run.head_branch }}
+          ARM_SHA256: ${{ steps.sha.outputs.arm_sha256 }}
+          ARM_URL: ${{ steps.sha.outputs.arm_url }}
+          AMD_SHA256: ${{ steps.sha.outputs.amd_sha256 }}
+          AMD_URL: ${{ steps.sha.outputs.amd_url }}
         run: |
           VERSION="${TAG#v}"
-          sed -i "s|url \".*\"|url \"$URL\"|" Formula/bose-nc.rb
-          sed -i "s|sha256 \".*\"|sha256 \"$SHA256\"|" Formula/bose-nc.rb
+          cat > Formula/bose-nc.rb << EOF
+          class BoseNc < Formula
+            desc "CLI tool for controlling Bose noise cancelling headphones"
+            homepage "https://github.com/mishamyrt/bose-nc"
+            version "${VERSION}"
+            license "MIT"
+
+            on_arm do
+              url "${ARM_URL}"
+              sha256 "${ARM_SHA256}"
+            end
+
+            on_intel do
+              url "${AMD_URL}"
+              sha256 "${AMD_SHA256}"
+            end
+
+            depends_on :macos
+
+            def install
+              bin.install "bose-nc"
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/bose-nc --version")
+            end
+          end
+          EOF
+          sed -i 's/^          //' Formula/bose-nc.rb
 
       - name: Commit and push
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ github.event.workflow_run.head_branch }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
