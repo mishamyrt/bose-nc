@@ -1,12 +1,12 @@
 [package]
 name = "bose-nc"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 homepage = "https://github.com/mishamyrt/bose-nc"
 documentation = "https://github.com/mishamyrt/bose-nc"
 repository = "https://github.com/mishamyrt/bose-nc"
 authors = ["Mikhael Khrustik <misha@myrt.co>"]
-keywords = ["bose", "macos", "reverse-engineering"]
+keywords = ["bose", "macos", "reverse-engineering", "cli"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
