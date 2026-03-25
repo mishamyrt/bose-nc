@@ -95,6 +95,9 @@ impl BoseDevice {
 
     pub(crate) fn set_nc(&self, level: u8, enabled: bool) -> Result<()> {
         let cmd = bmap::cnc_set_packet(level, enabled);
+        self.send_command(&cmd)?;
+        // Send twice: the device restores the previous level when re-enabling NC,
+        // so the second packet applies the correct level once NC is already on.
         self.send_command(&cmd)
     }
 }

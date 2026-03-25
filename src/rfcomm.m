@@ -47,7 +47,7 @@ static int find_spp_channel(IOBluetoothDevice *device) {
     NSArray *services = [device services];
     if (!services) {
         [device performSDPQuery:nil];
-        run_loop_for(3.0);
+        run_loop_for(0.1);
         services = [device services];
     }
     if (!services) return -1;
@@ -110,7 +110,7 @@ int bose_rfcomm_send(const char *bt_address,
 
         if (!rfcomm) return -3;
 
-        run_loop_for(0.5);
+        run_loop_for(0.1);
 
         result = [rfcomm writeSync:(void *)send_buf length:send_len];
         if (result != kIOReturnSuccess) {
@@ -119,7 +119,7 @@ int bose_rfcomm_send(const char *bt_address,
         }
 
         // Wait for response
-        run_loop_for(2.0);
+        run_loop_for(0.1);
 
         int received = (int)[delegate.receivedData length];
         if (received > 0 && out_buf && out_capacity > 0) {
@@ -129,7 +129,7 @@ int bose_rfcomm_send(const char *bt_address,
         }
 
         [rfcomm closeChannel];
-        run_loop_for(0.3);
+        run_loop_for(0.1);
 
         return received;
     }

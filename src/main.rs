@@ -5,10 +5,13 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "bose-cli", about = "Control noise cancellation on Bose headphones")]
+#[command(
+    name = "bose-cli",
+    about = "Control noise cancellation on Bose headphones"
+)]
 struct Cli {
     /// Filter device by name substring (e.g. "NC700", "`QCUltra`")
-    #[arg(short, long)]
+    #[arg(short, long, global = true)]
     device: Option<String>,
 
     #[command(subcommand)]
@@ -60,12 +63,8 @@ fn main() -> Result<()> {
             if level > 10 {
                 return Err(anyhow::anyhow!("Level must be 0-10"));
             }
-            dev.set_nc(level, level > 0)?;
-            println!("Noise cancellation: {}", if level > 0 {
-                format!("ON (level {level})")
-            } else {
-                "OFF (transparency)".to_string()
-            });
+            dev.set_nc(level, true)?;
+            println!("Noise cancellation: {}", format!("ON (level {level})"));
         }
         Command::Off => {
             dev.set_nc(0, false)?;
