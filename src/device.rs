@@ -1,12 +1,12 @@
 use std::ffi::CString;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 use crate::bmap::{self, BmapPacket, CncStatus, Operator};
 
 const RESPONSE_BUF_SIZE: usize = 256;
 
-extern "C" {
+unsafe extern "C" {
     fn bose_rfcomm_send(
         bt_address: *const i8,
         send_buf: *const u8,
@@ -152,7 +152,11 @@ pub fn find_device(name_filter: Option<&str>) -> Result<BoseDevice> {
         0 => Err(anyhow!(
             "No Bose device matches '{}'. Available: {}",
             name_filter.unwrap_or(""),
-            devices.iter().map(|d| d.name.as_str()).collect::<Vec<_>>().join(", ")
+            devices
+                .iter()
+                .map(|d| d.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
         )),
         1 => {
             let d = filtered[0];
