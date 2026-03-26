@@ -39,6 +39,9 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+
+    /// Print current version and exit
+    Version,
 }
 
 #[allow(clippy::print_stdout)]
@@ -82,6 +85,10 @@ fn main() -> Result<()> {
             let dev = device::find_device(cli.device.as_deref())?;
             dev.disable_nc()?;
             println!("Noise cancellation: OFF");
+        }
+        Command::Version => {
+            println!("bose-nc {}", env!("CARGO_PKG_VERSION"));
+            return Ok(());
         }
     }
 
