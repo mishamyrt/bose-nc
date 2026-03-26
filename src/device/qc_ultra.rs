@@ -28,7 +28,7 @@ impl DeviceProfile for QcUltra {
     }
 
     fn build_nc_get(&self) -> Vec<u8> {
-        Packet::new(FB, FN, bmap::OP_GET, vec![]).to_bytes()
+        Packet::new(FB, FN, bmap::OP_GET, vec![0x03]).to_bytes()
     }
 
     fn build_nc_set(&self, level: u8) -> Vec<u8> {
@@ -74,10 +74,7 @@ mod tests {
     #[test]
     fn get_packet_format() {
         let bytes = profile().build_nc_get();
-        assert_eq!(bytes[0], FB);
-        assert_eq!(bytes[1], FN);
-        assert_eq!(bytes[2] & 0x0F, bmap::OP_GET);
-        assert_eq!(bytes[3], 0x00);
+        assert_eq!(bytes, vec![0x1f, 0x06, 0x01, 0x01, 0x03]);
     }
 
     #[test]
