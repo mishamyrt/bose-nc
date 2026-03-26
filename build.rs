@@ -1,8 +1,8 @@
 fn main() {
-    println!("cargo:rerun-if-changed=src/rfcomm.m");
+    println!("cargo:rerun-if-changed=src/bluetooth/rfcomm.m");
 
     cc::Build::new()
-        .file("src/rfcomm.m")
+        .file("src/bluetooth/rfcomm.m")
         .flag("-fobjc-arc")
         .compile("rfcomm");
 

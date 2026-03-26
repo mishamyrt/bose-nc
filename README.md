@@ -7,8 +7,10 @@ Communicates with headphones using the BMAP (Bose Multi-device Application Proto
 ## Supported devices
 
 - Bose Noise Cancelling Headphones 700
-
-Other Bose headphones that use BMAP over SPP may also work.
+- Bose QuietComfort Ultra Headphones
+- Bose QuietComfort 35
+- Bose QuietComfort 45
+- Bose QuietComfort Earbuds
 
 ## Requirements
 

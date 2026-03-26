@@ -55,32 +55,20 @@ static int find_spp_channel(IOBluetoothDevice *device) {
     }
     if (!services) return -1;
 
+    IOBluetoothSDPUUID *sppUUID = [IOBluetoothSDPUUID uuid16:0x1101];
+
     for (IOBluetoothSDPServiceRecord *record in services) {
-        NSString *name = [record getServiceName];
-        if (name && [name isEqualToString:@"SPP Dev"]) {
-            BluetoothRFCOMMChannelID channelID = 0;
-            IOReturn result = [record getRFCOMMChannelID:&channelID];
-            if (result == kIOReturnSuccess) {
-                return (int)channelID;
-            }
-            IOBluetoothSDPDataElement *proto = [record getAttributeDataElement:0x0004];
-            if (proto) {
-                NSArray *protoList = [proto getArrayValue];
-                for (IOBluetoothSDPDataElement *entry in protoList) {
-                    NSArray *elems = [entry getArrayValue];
-                    if (elems.count >= 2) {
-                        IOBluetoothSDPDataElement *uuidElem = elems[0];
-                        IOBluetoothSDPUUID *uuid = [uuidElem getUUIDValue];
-                        uint8_t rfcommUUID[] = {0x00, 0x03};
-                        if (uuid && [(NSData *)uuid length] >= 2 &&
-                            memcmp([(NSData *)uuid bytes], rfcommUUID, 2) == 0) {
-                            IOBluetoothSDPDataElement *chElem = elems[1];
-                            return (int)[[chElem getNumberValue] intValue];
-                        }
-                    }
-                }
-            }
+        if (![record matchesUUIDArray:@[sppUUID]]) continue;
+
+        BluetoothRFCOMMChannelID channelID = 0;
+        if ([record getRFCOMMChannelID:&channelID] == kIOReturnSuccess) {
+            return (int)channelID;
         }
+    }
+
+    NSLog(@"bose-nc: no SPP (0x1101) service found. Available services:");
+    for (IOBluetoothSDPServiceRecord *record in services) {
+        NSLog(@"bose-nc:   - %@", [record getServiceName] ?: @"(unnamed)");
     }
     return -1;
 }
@@ -147,42 +135,5 @@ int bose_rfcomm_send(const char *bt_address,
         run_loop_for(kChannelCloseWaitTime);
 
         return received;
-    }
-}
-
-int bose_list_devices(char *out_buf, int out_capacity) {
-    @autoreleasepool {
-        if (out_capacity <= 0) {
-            return 0;
-        }
-
-        NSArray *paired = [IOBluetoothDevice pairedDevices];
-        int count = 0;
-        int offset = 0;
-
-        for (IOBluetoothDevice *device in paired) {
-            if (![device isConnected]) continue;
-            NSString *name = [device name];
-            if (!name) continue;
-            NSString *lower = [name lowercaseString];
-            if (![lower containsString:@"bose"]) continue;
-
-            NSString *addr = [[device addressString]
-                              stringByReplacingOccurrencesOfString:@"-" withString:@":"];
-            NSString *line = [NSString stringWithFormat:@"%@\t%@\n",
-                              [addr uppercaseString], name];
-            const char *cstr = [line UTF8String];
-            int len = (int)strlen(cstr);
-
-            if (offset + len < out_capacity) {
-                memcpy(out_buf + offset, cstr, len);
-                offset += len;
-                count++;
-            }
-        }
-
-        out_buf[offset] = '\0';
-
-        return count;
     }
 }
