@@ -117,6 +117,6 @@ mod tests {
         pkt.device_id = 0x02;
         pkt.port_num = 0x01;
         let bytes = pkt.to_bytes();
-        assert_eq!(bytes[2], 0b10_01_0010);
+        assert_eq!(bytes[2], 0b1001_0010);
     }
 }
