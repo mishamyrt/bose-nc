@@ -1,0 +1,27 @@
+name: QA
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  qa:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Run linter
+        run: cargo clippy --all-targets -- -D warnings
