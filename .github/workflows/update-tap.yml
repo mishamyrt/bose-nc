@@ -40,35 +40,37 @@ jobs:
           AMD_URL: ${{ steps.sha.outputs.amd_url }}
         run: |
           VERSION="${TAG#v}"
-          cat > Formula/bose-nc.rb << EOF
+          cat > Formula/bose-nc.rb << 'FORMULA'
           class BoseNc < Formula
             desc "CLI tool for controlling Bose noise cancelling headphones"
             homepage "https://github.com/mishamyrt/bose-nc"
-            version "${VERSION}"
             license "MIT"
 
-            on_arm do
-              url "${ARM_URL}"
-              sha256 "${ARM_SHA256}"
-            end
-
-            on_intel do
-              url "${AMD_URL}"
-              sha256 "${AMD_SHA256}"
-            end
-
             depends_on :macos
+
+            if Hardware::CPU.arm?
+              url "ARM_URL_PLACEHOLDER"
+              sha256 "ARM_SHA256_PLACEHOLDER"
+            else
+              url "AMD_URL_PLACEHOLDER"
+              sha256 "AMD_SHA256_PLACEHOLDER"
+            end
 
             def install
               bin.install "bose-nc"
             end
 
             test do
-              assert_match version.to_s, shell_output("#{bin}/bose-nc --version")
+              assert_match version.to_s, shell_output("#{bin}/bose-nc version")
             end
           end
-          EOF
+          FORMULA
           sed -i 's/^          //' Formula/bose-nc.rb
+          sed -i "s|VERSION_PLACEHOLDER|${VERSION}|" Formula/bose-nc.rb
+          sed -i "s|ARM_URL_PLACEHOLDER|${ARM_URL}|" Formula/bose-nc.rb
+          sed -i "s|ARM_SHA256_PLACEHOLDER|${ARM_SHA256}|" Formula/bose-nc.rb
+          sed -i "s|AMD_URL_PLACEHOLDER|${AMD_URL}|" Formula/bose-nc.rb
+          sed -i "s|AMD_SHA256_PLACEHOLDER|${AMD_SHA256}|" Formula/bose-nc.rb
 
       - name: Commit and push
         env:
