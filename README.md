@@ -8,9 +8,9 @@ Communicates with headphones using the BMAP (Bose Multi-device Application Proto
 
 - Bose Noise Cancelling Headphones 700
 - Bose QuietComfort Ultra Headphones
-- Bose QuietComfort 35
-- Bose QuietComfort 45
-- Bose QuietComfort Earbuds
+- Bose QuietComfort 35 (needs testing)
+- Bose QuietComfort 45 (needs testing)
+- Bose QuietComfort Earbuds (needs testing)
 
 ## Requirements
 
