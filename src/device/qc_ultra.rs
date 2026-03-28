@@ -1,8 +1,6 @@
-use anyhow::{Result, bail};
+use crate::device::bmap::{self, Packet, PacketError};
 
-use crate::bmap::{self, Packet};
-
-use super::{Capability, DeviceProfile, NcStatus};
+use super::{Capability, DeviceProfile, NcStatus, Result};
 
 pub(crate) const PRODUCT_ID: u16 = 0x4066;
 
@@ -45,10 +43,7 @@ impl DeviceProfile for QcUltra {
     fn parse_nc_status(&self, payload: &[u8]) -> Result<NcStatus> {
         const MIN_PAYLOAD: usize = 47;
         if payload.len() < MIN_PAYLOAD {
-            bail!(
-                "ANR payload too short: {} bytes, need at least {MIN_PAYLOAD}",
-                payload.len()
-            );
+            return Err(PacketError::TooShort(payload.len(), MIN_PAYLOAD).into());
         }
         let num_steps = payload[2];
         let max_level = num_steps.saturating_sub(1);

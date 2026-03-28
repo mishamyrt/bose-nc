@@ -1,13 +1,22 @@
 mod bluetooth;
-mod bmap;
 mod device;
+mod reports;
+mod select_device;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
+
+use crate::{
+    device::{device_info, list_bose_devices},
+    reports::{
+        OffReport, Report, ScanFormat, ScanItem, ScanReport, SetReport, StatusReport, VersionReport,
+    },
+    select_device::find_device,
+};
 
 #[derive(Parser)]
 #[command(
-    name = "bose-cli",
+    name = "bose-nc",
     about = "Control noise cancellation on Bose headphones"
 )]
 struct Cli {
@@ -44,105 +53,84 @@ enum Command {
     Version,
 }
 
-#[allow(clippy::print_stdout)]
 fn main() -> Result<()> {
     let cli = Cli::parse();
-
-    match cli.command {
-        Command::Scan { json } => {
-            let devices = device::list_bose_devices();
-            if json {
-                print_scan_json(&devices);
-            } else {
-                print_scan_text(&devices);
-            }
-        }
-        Command::Status => {
-            let dev = device::find_device(cli.device.as_deref())?;
-            let status = dev.get_nc_status()?;
-            if status.enabled {
-                println!(
-                    "Noise cancellation: ON (level {}/{})",
-                    status.level, status.max_level
-                );
-            } else {
-                println!("Noise cancellation: OFF");
-            }
-        }
-        Command::Set { level } => {
-            let dev = device::find_device(cli.device.as_deref())?;
-            let max = dev.max_nc_level();
-            if level > max {
-                anyhow::bail!(
-                    "level {level} exceeds maximum ({max}) for {}",
-                    dev.product_name()
-                );
-            }
-            dev.set_nc(level)?;
-            println!("Noise cancellation: ON (level {level})");
-        }
-        Command::Off => {
-            let dev = device::find_device(cli.device.as_deref())?;
-            dev.disable_nc()?;
-            println!("Noise cancellation: OFF");
-        }
-        Command::Version => {
-            println!("bose-nc {}", env!("CARGO_PKG_VERSION"));
-            return Ok(());
-        }
-    }
-
-    Ok(())
-}
-
-#[allow(clippy::print_stdout)]
-fn print_scan_text(devices: &[bluetooth::BluetoothDevice]) {
-    if devices.is_empty() {
-        println!("No paired Bose devices found.");
-        return;
-    }
-    for d in devices {
-        println!("  {} ({})", d.name, d.address);
-        if let Some(info) = device::device_info(d) {
-            let caps: Vec<&str> = info.capabilities.iter().map(|c| c.as_str()).collect();
-            println!("    NC levels: 0-{}", info.max_nc_level);
-            println!("    Capabilities: {}", caps.join(", "));
+    let report = match cli.command {
+        Command::Scan { json } => Ok(run_scan(if json {
+            ScanFormat::Json
         } else {
-            println!("    (unsupported model)");
-        }
-    }
+            ScanFormat::Text
+        })),
+        Command::Status => run_status(cli.device.as_deref()),
+        Command::Set { level } => run_set(cli.device.as_deref(), level),
+        Command::Off => run_off(cli.device.as_deref()),
+        Command::Version => Ok(Report::Version(VersionReport {
+            version: env!("CARGO_PKG_VERSION"),
+        })),
+    }?;
+    reports::print(report)
 }
 
-#[allow(clippy::print_stdout)]
-fn print_scan_json(devices: &[bluetooth::BluetoothDevice]) {
-    let items: Vec<serde_json::Value> = devices
-        .iter()
-        .map(|d| {
-            let mut obj = serde_json::json!({
-                "name": d.name,
-                "address": d.address,
-            });
-            if let Some(info) = device::device_info(d) {
-                let map = obj.as_object_mut().unwrap();
-                map.insert(
-                    "product".into(),
-                    serde_json::Value::String(info.product_name.into()),
-                );
-                map.insert("max_nc_level".into(), info.max_nc_level.into());
-                map.insert(
-                    "capabilities".into(),
-                    info.capabilities
-                        .iter()
-                        .map(|c| serde_json::Value::String(c.as_str().into()))
-                        .collect(),
-                );
+fn run_scan(format: ScanFormat) -> Report {
+    let items = list_bose_devices()
+        .into_iter()
+        .map(|device| {
+            let info = device_info(&device);
+            ScanItem {
+                name: device.name,
+                address: device.address,
+                product: info.as_ref().map(|info| info.product_name.to_owned()),
+                max_nc_level: info.as_ref().map(|info| info.max_nc_level),
+                capabilities: info
+                    .map(|info| {
+                        info.capabilities
+                            .iter()
+                            .map(|capability| capability.as_str().to_owned())
+                            .collect()
+                    })
+                    .unwrap_or_default(),
             }
-            obj
         })
         .collect();
 
-    #[allow(clippy::print_stdout)]
-    if let Ok(json) = serde_json::to_string_pretty(&items) {
-        println!("{json}");
+    Report::Scan(ScanReport { format, items })
+}
+
+fn run_status(name_filter: Option<&str>) -> Result<Report> {
+    let selected = find_device(name_filter)?;
+    let status = selected.device.get_nc_status()?;
+
+    Ok(Report::Status(StatusReport {
+        notices: selected.notices,
+        enabled: status.enabled,
+        level: status.level,
+        max_level: status.max_level,
+    }))
+}
+
+fn run_set(name_filter: Option<&str>, level: u8) -> Result<Report> {
+    let selected = find_device(name_filter)?;
+    let max_level = selected.device.max_nc_level();
+    if level > max_level {
+        bail!(
+            "level {level} exceeds maximum ({max_level}) for {}",
+            selected.device.product_name()
+        );
     }
+
+    selected.device.set_nc(level)?;
+
+    Ok(Report::Set(SetReport {
+        notices: selected.notices,
+        level,
+    }))
+}
+
+fn run_off(name_filter: Option<&str>) -> Result<Report> {
+    let selected = find_device(name_filter)?;
+    selected.device.disable_nc()?;
+
+    Ok(Report::Off(OffReport {
+        notices: selected.notices,
+    }))
 }

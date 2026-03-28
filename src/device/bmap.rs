@@ -9,7 +9,7 @@
 //!   byte 2 — device id (2 bit) | port num (2 bit) | operator (4 bit)
 //!   byte 3 — payload length
 
-use anyhow::{Result, bail};
+use thiserror::Error;
 
 pub(crate) const OP_GET: u8 = 0x01;
 pub(crate) const OP_SET_GET: u8 = 0x02;
@@ -18,6 +18,18 @@ pub(crate) const OP_STATUS: u8 = 0x03;
 pub(crate) const OP_ERROR: u8 = 0x04;
 
 const HEADER_SIZE: usize = 4;
+
+#[derive(Debug, Error)]
+pub(crate) enum PacketError {
+    #[error("payload truncated: have {0} bytes, need {1}")]
+    PayloadTruncated(usize, usize),
+
+    #[error("empty payload")]
+    EmptyPayload,
+
+    #[error("too short: {0} bytes, need at least {1}")]
+    TooShort(usize, usize),
+}
 
 #[derive(Debug)]
 pub(crate) struct Packet {
@@ -30,12 +42,7 @@ pub(crate) struct Packet {
 }
 
 impl Packet {
-    pub(crate) fn new(
-        function_block: u8,
-        function: u8,
-        operator: u8,
-        payload: Vec<u8>,
-    ) -> Self {
+    pub(crate) fn new(function_block: u8, function: u8, operator: u8, payload: Vec<u8>) -> Self {
         Self {
             function_block,
             function,
@@ -61,19 +68,16 @@ impl Packet {
         buf
     }
 
-    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self, PacketError> {
         if data.len() < HEADER_SIZE {
-            bail!(
-                "packet too short: {} bytes, need at least {HEADER_SIZE}",
-                data.len()
-            );
+            return Err(PacketError::TooShort(data.len(), HEADER_SIZE));
         }
         let payload_len = data[3] as usize;
         if data.len() < HEADER_SIZE + payload_len {
-            bail!(
-                "payload truncated: have {} bytes, need {payload_len}",
-                data.len() - HEADER_SIZE
-            );
+            return Err(PacketError::PayloadTruncated(
+                data.len() - HEADER_SIZE,
+                payload_len,
+            ));
         }
         Ok(Self {
             function_block: data[0],

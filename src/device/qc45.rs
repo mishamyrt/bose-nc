@@ -6,11 +6,9 @@
 //! Modes: Quiet=0x00 (max NC), Aware=0x01 (transparency)
 //! User levels: 0=Off/Aware, 1=Quiet
 
-use anyhow::{Result, bail};
+use crate::device::bmap::{self, Packet, PacketError};
 
-use crate::bmap::Packet;
-
-use super::{Capability, DeviceProfile, NcStatus};
+use super::{Capability, DeviceProfile, NcStatus, Result};
 
 pub(crate) const PRODUCT_ID: u16 = 0x4039;
 
@@ -38,7 +36,7 @@ impl DeviceProfile for Qc45 {
     }
 
     fn build_nc_get(&self) -> Vec<u8> {
-        Packet::new(FB, FN, crate::bmap::OP_GET, vec![]).to_bytes()
+        Packet::new(FB, FN, bmap::OP_GET, vec![]).to_bytes()
     }
 
     fn build_nc_set(&self, level: u8) -> Vec<u8> {
@@ -48,7 +46,7 @@ impl DeviceProfile for Qc45 {
 
     fn parse_nc_status(&self, payload: &[u8]) -> Result<NcStatus> {
         if payload.is_empty() {
-            bail!("QC45 payload empty");
+            return Err(PacketError::EmptyPayload.into());
         }
         let mode = payload[0];
         let (level, enabled) = if mode == MODE_QUIET {

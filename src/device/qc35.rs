@@ -7,11 +7,9 @@
 //! Wire values: Off=0x00, High=0x01, Medium=0x02, Low=0x03
 //! User levels: 0=Off, 1=Low, 2=Medium, 3=High
 
-use anyhow::{Result, bail};
+use crate::device::bmap::{self, Packet, PacketError};
 
-use crate::bmap::{self, Packet};
-
-use super::{Capability, DeviceProfile, NcStatus};
+use super::{Capability, DeviceProfile, NcStatus, Result};
 
 pub(crate) const PRODUCT_ID: u16 = 0x400C;
 
@@ -58,10 +56,7 @@ impl DeviceProfile for Qc35 {
 
     fn parse_nc_status(&self, payload: &[u8]) -> Result<NcStatus> {
         if payload.len() < 2 {
-            bail!(
-                "QC35 payload too short: {} bytes, need at least 2",
-                payload.len()
-            );
+            return Err(PacketError::TooShort(payload.len(), 2).into());
         }
         let wire = payload[0];
         let level = wire_to_user(wire);

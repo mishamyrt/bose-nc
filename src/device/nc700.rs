@@ -1,8 +1,9 @@
-use anyhow::{Result, bail};
+use crate::{
+    device::bmap::{self, Packet, PacketError},
+    device::types::Capability,
+};
 
-use crate::bmap::{self, Packet};
-
-use super::{Capability, DeviceProfile, NcStatus};
+use super::{DeviceProfile, NcStatus, Result};
 
 pub(crate) const PRODUCT_ID: u16 = 0x4024;
 
@@ -40,10 +41,7 @@ impl DeviceProfile for Nc700 {
 
     fn parse_nc_status(&self, payload: &[u8]) -> Result<NcStatus> {
         if payload.len() < 3 {
-            bail!(
-                "CNC payload too short: {} bytes, need at least 3",
-                payload.len()
-            );
+            return Err(PacketError::TooShort(payload.len(), 3).into());
         }
         let num_steps = payload[0];
         let wire_level = payload[1];

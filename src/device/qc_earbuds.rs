@@ -12,11 +12,9 @@
 //! User levels: 0=Aware, 1=Medium(User-1), 2=Quiet(max)
 //! Off command → User-2 (hardware off, distinct from Aware/transparency)
 
-use anyhow::{Result, bail};
+use crate::device::bmap::{self, Packet, PacketError};
 
-use crate::bmap::Packet;
-
-use super::{Capability, DeviceProfile, NcStatus};
+use super::{Capability, DeviceProfile, NcStatus, Result};
 
 pub(crate) const PRODUCT_ID: u16 = 0x402F;
 
@@ -63,7 +61,7 @@ impl DeviceProfile for QcEarbuds {
     }
 
     fn build_nc_get(&self) -> Vec<u8> {
-        Packet::new(FB, FN, crate::bmap::OP_GET, vec![]).to_bytes()
+        Packet::new(FB, FN, bmap::OP_GET, vec![]).to_bytes()
     }
 
     fn build_nc_set(&self, level: u8) -> Vec<u8> {
@@ -76,7 +74,7 @@ impl DeviceProfile for QcEarbuds {
 
     fn parse_nc_status(&self, payload: &[u8]) -> Result<NcStatus> {
         if payload.is_empty() {
-            bail!("QC Earbuds payload empty");
+            return Err(PacketError::EmptyPayload.into());
         }
         let (level, enabled) = mode_to_level(payload[0]);
         Ok(NcStatus {
