@@ -1,16 +1,19 @@
 #import <Foundation/Foundation.h>
 #import <IOBluetooth/IOBluetooth.h>
 
-static const NSTimeInterval kChannelOpenSettleTime = 0.1;
+static const NSTimeInterval kChannelOpenTimeout    = 2.0;
 static const NSTimeInterval kInterWriteDelay       = 0.05;
 static const NSTimeInterval kResponseWaitTime      = 0.1;
-static const NSTimeInterval kChannelCloseWaitTime  = 0.1;
+static const NSTimeInterval kChannelCloseTimeout   = 2.0;
 static const NSTimeInterval kSDPQueryTimeout       = 2.0;
+static const NSTimeInterval kRunLoopGranularity    = 0.05;
 
-@interface BoseRFCOMMDelegate : NSObject <IOBluetoothRFCOMMChannelDelegate>
-@property (nonatomic) BOOL channelOpen;
+@interface BoseRFCOMMDelegate : NSObject <IOBluetoothRFCOMMChannelDelegate> {
+    @public
+    BOOL _channelOpen;
+    BOOL _channelClosed;
+}
 @property (nonatomic, strong) NSMutableData *receivedData;
-@property (nonatomic) BOOL channelClosed;
 @end
 
 @implementation BoseRFCOMMDelegate
@@ -73,6 +76,22 @@ static int find_spp_channel(IOBluetoothDevice *device) {
     return -1;
 }
 
+static BOOL wait_for(BOOL *flag, NSTimeInterval timeout) {
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    while (!*flag && [[NSDate date] compare:deadline] == NSOrderedAscending) {
+        [[NSRunLoop currentRunLoop]
+            runUntilDate:[NSDate dateWithTimeIntervalSinceNow:kRunLoopGranularity]];
+    }
+    return *flag;
+}
+
+static void close_rfcomm(IOBluetoothRFCOMMChannel *rfcomm,
+                         BoseRFCOMMDelegate *delegate) {
+    [rfcomm closeChannel];
+    wait_for(&delegate->_channelClosed, kChannelCloseTimeout);
+    [rfcomm setDelegate:nil];
+}
+
 int bose_rfcomm_send(const char *bt_address,
                      const uint8_t *send_buf, int send_len,
                      uint8_t *out_buf, int out_capacity,
@@ -106,15 +125,18 @@ int bose_rfcomm_send(const char *bt_address,
             return -3;
         }
 
-        run_loop_for(kChannelOpenSettleTime);
+        if (!wait_for(&delegate->_channelOpen, kChannelOpenTimeout)) {
+            NSLog(@"bose-nc: timed out waiting for RFCOMM channel open callback");
+            close_rfcomm(rfcomm, delegate);
+            return -3;
+        }
 
         if (send_count < 1) send_count = 1;
         for (int i = 0; i < send_count; i++) {
-            // writeSync takes a non-const pointer but does not modify the buffer.
             result = [rfcomm writeSync:(void *)send_buf length:send_len];
             if (result != kIOReturnSuccess) {
                 NSLog(@"bose-nc: RFCOMM write failed (IOReturn %#x)", result);
-                [rfcomm closeChannel];
+                close_rfcomm(rfcomm, delegate);
                 return -4;
             }
             if (i < send_count - 1) {
@@ -131,8 +153,7 @@ int bose_rfcomm_send(const char *bt_address,
             received = copy_len;
         }
 
-        [rfcomm closeChannel];
-        run_loop_for(kChannelCloseWaitTime);
+        close_rfcomm(rfcomm, delegate);
 
         return received;
     }
