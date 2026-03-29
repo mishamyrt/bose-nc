@@ -47,6 +47,7 @@ impl RfcommHandle {
         Ok(Self { address })
     }
 
+    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
     pub(crate) fn send(&self, data: &[u8], repeat: i32) -> RfcommResult<()> {
         let n = unsafe {
             bose_rfcomm_send(
@@ -63,6 +64,7 @@ impl RfcommHandle {
         Ok(())
     }
 
+    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
     pub(crate) fn send_receive(&self, data: &[u8]) -> RfcommResult<Vec<u8>> {
         let mut buf = [0u8; RESPONSE_BUF_SIZE];
         let n = unsafe {

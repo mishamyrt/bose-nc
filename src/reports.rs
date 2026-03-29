@@ -52,7 +52,7 @@ pub(crate) struct VersionReport {
 #[allow(clippy::print_stdout, clippy::print_stderr)]
 pub(crate) fn print(report: Report) -> Result<()> {
     match report {
-        Report::Scan(report) => print_scan(report)?,
+        Report::Scan(report) => print_scan(&report)?,
         Report::Status(report) => {
             print_notices(&report.notices);
             if report.enabled {
@@ -79,7 +79,7 @@ pub(crate) fn print(report: Report) -> Result<()> {
 }
 
 #[allow(clippy::print_stdout)]
-fn print_scan(report: ScanReport) -> Result<()> {
+fn print_scan(report: &ScanReport) -> Result<()> {
     match report.format {
         ScanFormat::Text => print_scan_text(&report.items),
         ScanFormat::Json => print_scan_json(&report.items)?,

@@ -110,7 +110,7 @@ impl ConnectedDevice {
         let cmd = self
             .profile
             .build_nc_off()
-            .ok_or_else(|| DeviceError::NcDisableNotSupported)?;
+            .ok_or(DeviceError::NcDisableNotSupported)?;
         self.handle.send(&cmd, self.profile.nc_set_repeat_count())?;
         Ok(())
     }

@@ -71,9 +71,7 @@ pub(crate) fn list_connected_devices() -> Result<Vec<BluetoothDevice>, SystemPro
 fn parse_device(raw: &Value) -> Option<BluetoothDevice> {
     let obj = raw.as_object()?;
     let (name, props) = obj.into_iter().next()?;
-    let Some(address) = props["device_address"].as_str().map(String::from) else {
-        return None;
-    };
+    let address = props["device_address"].as_str().map(String::from)?;
     let vendor_id = props["device_vendorID"].as_str().and_then(parse_id);
     let product_id = props["device_productID"].as_str().and_then(parse_id);
 
