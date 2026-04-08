@@ -1,7 +1,12 @@
-use anyhow::Result;
-use serde_json::{Value, json};
+use serde_json::json;
 
-use crate::select_device::SelectionNotice;
+use crate::error::AppError;
+
+#[derive(Clone, Copy)]
+pub(crate) enum OutputFormat {
+    Text,
+    Json,
+}
 
 pub(crate) enum Report {
     Scan(ScanReport),
@@ -12,20 +17,14 @@ pub(crate) enum Report {
 }
 
 pub(crate) struct ScanReport {
-    pub(crate) format: ScanFormat,
     pub(crate) items: Vec<ScanItem>,
-}
-
-pub(crate) enum ScanFormat {
-    Text,
-    Json,
 }
 
 pub(crate) struct ScanItem {
     pub(crate) name: String,
     pub(crate) address: String,
     pub(crate) product: Option<String>,
-    pub(crate) max_nc_level: Option<u8>,
+    pub(crate) max_level: Option<u8>,
     pub(crate) capabilities: Vec<String>,
 }
 
@@ -49,10 +48,34 @@ pub(crate) struct VersionReport {
     pub(crate) version: &'static str,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) enum SelectionNotice {
+    MultipleMatches {
+        matched: Vec<DeviceSummary>,
+        selected: DeviceSummary,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct DeviceSummary {
+    pub(crate) name: String,
+    pub(crate) address: String,
+}
+
+pub(crate) fn print(report: Report, format: OutputFormat) -> Result<(), AppError> {
+    match format {
+        OutputFormat::Text => {
+            print_text(report);
+            Ok(())
+        }
+        OutputFormat::Json => print_json(report),
+    }
+}
+
 #[allow(clippy::print_stdout, clippy::print_stderr)]
-pub(crate) fn print(report: Report) -> Result<()> {
+fn print_text(report: Report) {
     match report {
-        Report::Scan(report) => print_scan(&report)?,
+        Report::Scan(report) => print_scan_text(&report.items),
         Report::Status(report) => {
             print_notices(&report.notices);
             if report.enabled {
@@ -74,17 +97,52 @@ pub(crate) fn print(report: Report) -> Result<()> {
         }
         Report::Version(report) => println!("bose-nc {}", report.version),
     }
-
-    Ok(())
 }
 
 #[allow(clippy::print_stdout)]
-fn print_scan(report: &ScanReport) -> Result<()> {
-    match report.format {
-        ScanFormat::Text => print_scan_text(&report.items),
-        ScanFormat::Json => print_scan_json(&report.items)?,
-    }
-
+fn print_json(report: Report) -> Result<(), AppError> {
+    let value = match report {
+        Report::Scan(report) => {
+            let items: Vec<_> = report
+                .items
+                .iter()
+                .map(|item| {
+                    let mut obj = json!({
+                        "name": item.name,
+                        "address": item.address,
+                    });
+                    if let Some(product) = &item.product {
+                        let map = obj
+                            .as_object_mut()
+                            .expect("scan item should always be a JSON object");
+                        map.insert("product".into(), json!(product));
+                        map.insert(
+                            "max_level".into(),
+                            json!(item.max_level.unwrap_or_default()),
+                        );
+                        map.insert("capabilities".into(), json!(item.capabilities));
+                    }
+                    obj
+                })
+                .collect();
+            json!(items)
+        }
+        Report::Status(report) => json!({
+            "enabled": report.enabled,
+            "level": report.level,
+            "max_level": report.max_level,
+        }),
+        Report::Set(report) => json!({
+            "level": report.level,
+        }),
+        Report::Off(_) => json!({
+            "enabled": false,
+        }),
+        Report::Version(report) => json!({
+            "version": report.version,
+        }),
+    };
+    println!("{}", serde_json::to_string_pretty(&value)?);
     Ok(())
 }
 
@@ -94,55 +152,15 @@ fn print_scan_text(items: &[ScanItem]) {
         println!("No connected Bose devices found.");
         return;
     }
-
     for item in items {
         println!("  {} ({})", item.name, item.address);
-        if let Some(max_nc_level) = item.max_nc_level {
-            println!("    NC levels: 0-{max_nc_level}");
+        if let Some(max_level) = item.max_level {
+            println!("    NC levels: 0-{max_level}");
             println!("    Capabilities: {}", item.capabilities.join(", "));
         } else {
             println!("    (unsupported model)");
         }
     }
-}
-
-#[allow(clippy::print_stdout)]
-fn print_scan_json(items: &[ScanItem]) -> Result<()> {
-    let items: Vec<Value> = items
-        .iter()
-        .map(|item| {
-            let mut object = json!({
-                "name": item.name,
-                "address": item.address,
-            });
-
-            if let Some(product) = &item.product {
-                let map = object
-                    .as_object_mut()
-                    .expect("scan report items should always be JSON objects");
-                map.insert("product".into(), Value::String(product.clone()));
-                map.insert(
-                    "max_nc_level".into(),
-                    item.max_nc_level.unwrap_or_default().into(),
-                );
-                map.insert(
-                    "capabilities".into(),
-                    item.capabilities
-                        .iter()
-                        .cloned()
-                        .map(Value::String)
-                        .collect(),
-                );
-            }
-
-            object
-        })
-        .collect();
-
-    let json = serde_json::to_string_pretty(&items)?;
-    println!("{json}");
-
-    Ok(())
 }
 
 #[allow(clippy::print_stderr)]
