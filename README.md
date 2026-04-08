@@ -4,6 +4,8 @@ A macOS command-line tool to control noise cancellation on Bose headphones over 
 
 Communicates with headphones using the BMAP (Bose Multi-device Application Protocol), reverse-engineered from the Bose Music Android application.
 
+This utility also has a [Raycast extension](https://github.com/mishamyrt/raycast-bose-nc).
+
 ## Supported devices
 
 - Bose Noise Cancelling Headphones 700
@@ -15,8 +17,7 @@ Communicates with headphones using the BMAP (Bose Multi-device Application Proto
 ## Requirements
 
 - macOS (uses IOBluetooth framework)
-- Rust toolchain
-- Headphones paired and connected via Bluetooth
+- Bose headphones paired and connected via Bluetooth
 
 ## Installation
 
@@ -41,18 +42,10 @@ cp target/release/bose-nc /usr/local/bin/
 bose-nc scan
 ```
 
-```
-  Bose NC 700 HP (C8:7B:23:58:A3:7B)
-```
-
 ### Check noise cancellation status
 
 ```sh
 bose-nc status
-```
-
-```
-Noise cancellation: ON (level 5/10)
 ```
 
 ### Set noise cancellation level
@@ -62,12 +55,7 @@ Level ranges from `0` (full transparency) to `10` (maximum noise cancelling):
 ```sh
 bose-nc set 10   # max noise cancelling
 bose-nc set 0    # full transparency
-```
-
-### Turn off noise cancellation
-
-```sh
-bose-nc off
+bose-nc off      # turn off (only on supported headphones)
 ```
 
 ### Select a specific device
